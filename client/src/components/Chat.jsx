@@ -1,9 +1,36 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 const Chat = () => {
+	const [ws, setWs] = useState(null);
+	const [onlinePeople, setOnlinePeople] = useState({});
+	useEffect(() => {
+		const ws = new WebSocket("ws://localhost:3000");
+		setWs(ws);
+		ws.addEventListener("message", handleMessage);
+	}, []);
+
+	const showOnlinePoeple = (peopleArray) => {
+		const people = {};
+		peopleArray.forEach(({ userId, username }) => {
+			people[userId] = username;
+		});
+		setOnlinePeople(people);
+	};
+
+	const handleMessage = (e) => {
+		const messageData = JSON.parse(e.data);
+		if ("online" in messageData) {
+			showOnlinePoeple(messageData.online);
+		}
+	};
+
 	return (
 		<div className="flex h-screen">
-			<div className="bg-white w-1/3">Contacts</div>
+			<div className="bg-white w-1/3">
+				{Object.keys(onlinePeople).map((userId) => (
+					<div key={userId}>{onlinePeople[userId]}</div>
+				))}
+			</div>
 			<div className="flex flex-col bg-blue-100 w-2/3 p-2">
 				<div className="flex-grow"> messages with select person</div>
 				<div className="flex gap-2">
