@@ -1,7 +1,19 @@
 import "./App.css";
+import axios from "axios";
+import Routes from "./components/Routes";
+import { UserContextProvider } from "./components/UserContext";
 
 function App() {
-	return <div>Hello World</div>;
+	axios.defaults.baseURL = "http://localhost:3000";
+	axios.defaults.withCredentials = true;
+
+	return (
+		<div>
+			<UserContextProvider>
+				<Routes />
+			</UserContextProvider>
+		</div>
+	);
 }
 
 export default App;
