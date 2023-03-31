@@ -8,6 +8,7 @@ const bcrypt = require("bcryptjs");
 const ws = require("ws");
 
 const User = require("./models/User");
+const Message = require("./models/Message");
 
 const app = express();
 app.use(express.json());
@@ -76,6 +77,7 @@ app.post("/register", async (req, res) => {
 
 const server = app.listen(3000);
 
+// Read username and id from the cookie for this connection
 const wss = new ws.WebSocketServer({ server });
 wss.on("connection", (connection, req) => {
 	const cookies = req.headers.cookie;
@@ -95,6 +97,23 @@ wss.on("connection", (connection, req) => {
 			}
 		}
 	}
+
+	connection.on("message", async (message) => {
+		const messageData = JSON.parse(message.toString());
+		const { recipient, text } = messageData;
+		if (recipient && text) {
+			const messageDoc = await Message.create({
+				sender: connection.userId,
+				recipient,
+				text,
+			});
+			[...wss.clients]
+				.filter((c) => c.userId === recipient)
+				.forEach((c) => c.send(JSON.stringify({ text, sender: connection.userId, recipient, id: messageDoc._id })));
+		}
+	});
+
+	// Notify everyone about who is currently(online) connected to the websocket.
 	[...wss.clients].forEach((client) => {
 		client.send(
 			JSON.stringify({
