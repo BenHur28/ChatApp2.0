@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import Avatar from "./Avatar";
+import Person from "./Person";
 import { UserContext } from "./UserContext";
 import { uniqBy } from "lodash";
 import axios from "axios";
@@ -7,6 +8,7 @@ import axios from "axios";
 const Chat = () => {
 	const [ws, setWs] = useState(null);
 	const [onlinePeople, setOnlinePeople] = useState({});
+	const [offlinePeople, setOfflinePeople] = useState({});
 	const [selectedUser, setSelectedUser] = useState(null);
 	const [newMessageText, setNewMessageText] = useState("");
 	const [messages, setMessages] = useState([]);
@@ -55,7 +57,7 @@ const Chat = () => {
 			})
 		);
 		setNewMessageText("");
-		setMessages((prev) => [...prev, { text: newMessageText, sender: id, recipient: selectedUser, id: Date.now() }]);
+		setMessages((prev) => [...prev, { text: newMessageText, sender: id, recipient: selectedUser, _id: Date.now() }]);
 	};
 
 	useEffect(() => {
@@ -66,14 +68,27 @@ const Chat = () => {
 	}, [messages]);
 
 	useEffect(() => {
+		axios.get("/people").then((response) => {
+			const offlinePeopleArr = response.data.filter((p) => p._id !== id).filter((p) => !Object.keys(onlinePeople).includes(p._id));
+			const offlinePeople = {};
+			offlinePeopleArr.forEach((p) => {
+				offlinePeople[p._id] = p;
+			});
+			setOfflinePeople(offlinePeople);
+		});
+	}, [onlinePeople]);
+
+	useEffect(() => {
 		if (selectedUser) {
-			axios.get("/messages/" + selectedUser);
+			axios.get("/messages/" + selectedUser).then((response) => {
+				setMessages(response.data);
+			});
 		}
 	}, [selectedUser]);
 
 	const onlinePeopleExcludeUser = { ...onlinePeople };
 	delete onlinePeopleExcludeUser[id];
-	const messagesWithoutDupes = uniqBy(messages, "id");
+	const messagesWithoutDupes = uniqBy(messages, "_id");
 
 	return (
 		<div className="flex h-screen">
@@ -86,17 +101,24 @@ const Chat = () => {
 					Chat App 2.0
 				</div>
 				{Object.keys(onlinePeopleExcludeUser).map((userId) => (
-					<div
-						key={userId}
+					<Person
+						id={userId}
+						online={true}
+						username={onlinePeopleExcludeUser[userId]}
 						onClick={() => setSelectedUser(userId)}
-						className={"flex items-center gap-2 border-b border-gray-100 cursor-pointer" + (userId === selectedUser ? " bg-blue-100" : "")}
-					>
-						{userId === selectedUser && <div className="w-1 h-12 bg-blue-500 rounded-r-md"></div>}
-						<div className="flex gap-2 py-2 pl-4 items-center">
-							<Avatar username={onlinePeopleExcludeUser[userId]} userId={userId} />
-							<span className="text-gray-800">{onlinePeopleExcludeUser[userId]}</span>
-						</div>
-					</div>
+						selected={userId === selectedUser}
+						key={userId}
+					/>
+				))}
+				{Object.keys(offlinePeople).map((userId) => (
+					<Person
+						id={userId}
+						online={false}
+						username={offlinePeople[userId].username}
+						onClick={() => setSelectedUser(userId)}
+						selected={userId === selectedUser}
+						key={userId}
+					/>
 				))}
 			</div>
 			<div className="flex flex-col bg-blue-100 w-2/3 p-2">
@@ -105,13 +127,11 @@ const Chat = () => {
 					{!!selectedUser && (
 						<div className="relative h-full ">
 							<div className="overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
-								{messagesWithoutDupes.map((message, index) => (
-									<div key={index} className={message.sender === id ? "text-right" : "text-left"}>
+								{messagesWithoutDupes.map((message) => (
+									<div key={message._id} className={message.sender === id ? "text-right" : "text-left"}>
 										<div
 											className={"text-left inline-block p-2 my-2 rounded-lg " + (message.sender === id ? "bg-blue-500 text-white" : "bg-white text-gray-500")}
 										>
-											sender:{message.sender} <br />
-											my id: {id} <br />
 											{message.text}
 										</div>
 									</div>
